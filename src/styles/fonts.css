@@ -1,0 +1,32 @@
+/* ===========================
+   Fira COode (Variable Font)
+   =========================== */
+@font-face {
+  font-family: "Fira Code";
+  src: url("../assets/fonts/Fira_Code/FiraCode-VariableFont_wght.ttf") format("truetype");
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ===========================
+   Sora (Variable Font)
+   =========================== */
+@font-face {
+  font-family: "Sora";
+  src: url("../assets/fonts/Sora/Sora-VariableFont_wght.ttf") format("truetype");
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ===========================
+   Syne (Variable Font)
+   =========================== */
+@font-face {
+  font-family: "Syne";
+  src: url("../assets/fonts/Syne/Syne-VariableFont_wght.ttf") format("truetype");
+  font-weight: 400 600;
+  font-style: normal;
+  font-display: swap;
+}

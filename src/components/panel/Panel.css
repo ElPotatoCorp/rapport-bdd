@@ -1,0 +1,31 @@
+@import "../../styles/style.css";
+
+@layer components {
+  .panel-title {
+    @apply m-0! flex-1 text-lg!;
+  }
+
+  .panel-section {
+    @apply border-border rounded-lg border border-solid px-4 pt-3 pb-4;
+  }
+
+  .panel-section > legend {
+    @apply px-1.5 text-sm tracking-wider uppercase opacity-65;
+  }
+
+  .panel-btn {
+    @apply cursor-pointer rounded-sm border border-solid px-4 py-2 text-sm;
+  }
+
+  .panel-btn:disabled {
+    @apply cursor-not-allowed opacity-60;
+  }
+
+  .panel-btn--primary {
+    @apply bg-primary text-text-on-accent;
+  }
+
+  .panel-btn--secondary {
+    @apply border-border bg-none;
+  }
+}

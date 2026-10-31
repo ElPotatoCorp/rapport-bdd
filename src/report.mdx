@@ -1,0 +1,144 @@
+import { Figure, Callout, Collapsible } from "./components/mdx"
+import { easyTerm } from "./helpers/easy-term"
+import UML from "./assets/uml.png"
+import UML_SIMULATION from "./assets/simulation.png"
+import UML_SCRIPTING from "./assets/scripting.png"
+import UML_USER_SPACE from "./assets/user_space.png"
+import UML_INDEXEDDB from "./assets/indexeddb.png"
+
+# Introduction
+
+Pour le site web de ***SimuLABle***, nous avons modélisé une base de données de **25 tables** et **39 relations**, réparties en **6 parties** dont 4 sont centrales à notre projet.
+
+Ce rapport ne détaille que ces 4 parties : les tables que tout le monde connaît déjà (comme `users` ou `sessions`) sont volontairement laissées de côté.
+
+<Figure lightbox caption="UML de la base de données de SimuLABle">
+    <img src={UML} alt="UML de la base de données de SimuLABle" />
+</Figure>
+
+# Scripting & Versioning
+
+<Figure lightbox caption={`Section "Scripting" de l'UML`}>
+    <img src={UML_SCRIPTING} alt={`Section "Scripting" de l'UML`} />
+</Figure>
+
+On voulait un système de versioning très simple : pouvoir publier des {easyTerm('release', 'releases')} et garder des {easyTerm('draft', 'drafts')}, revenir en arrière facilement, ou simplement sauvegarder son travail. Pour ça, nous avons reproduit `git` en version allégée, pour coller exactement aux besoins du client sans être {easyTerm('bloated')}.
+
+- Les tables préfixées par `workspace` gèrent les environnements de travail.
+- `workspaces` représente un {easyTerm('repository')} sur `git`.
+- `workspace_versions` reprend le système de {easyTerm('commit', 'commits')} (avec possibilité de {easyTerm('revert')}) et de {easyTerm('tag', 'tags')}.
+
+Concrètement, on peut avoir un brouillon d'une ressource et le {easyTerm('tag', 'tagger')} pour en faire une {easyTerm('release')}. C'est utile quand la ressource est publique mais qu'on ne veut pas publier une version instable.
+
+## Optimisation & Performance
+
+On pourrait sauvegarder le contenu entier de chaque {easyTerm('commit')}, pour tout le monde, de manière exhaustive. Mais ça prendrait vite beaucoup de place pour pas grand-chose : `git` a déjà réglé le problème avec les {easyTerm('blob', 'blobs')}, qui stockent chaque contenu de façon unique.
+
+<Collapsible title="En savoir plus">
+Nous reprenons le système de blobs, mais comment ça marche concrètement ?
+
+Un algorithme de {easyTerm('hashage')} ({easyTerm('SHA-256')} par exemple) transforme n'importe quel contenu, quelle que soit sa taille, en une courte empreinte : le {easyTerm('checksum')}. Il sert généralement à vérifier l'intégrité d'un fichier (s'assurer qu'il n'a pas été modifié), mais il peut aussi servir d'identifiant.
+
+Quand on stocke le contenu d'un {easyTerm('commit')}, on enregistre son {easyTerm('checksum')} en base de données, et le fichier lui-même est stocké à un emplacement nommé d'après son hash.
+
+Par exemple, si deux personnes {easyTerm('commit')} ce contenu :
+
+```rs copy
+// My hello world
+
+print!("Hello, World!");
+```
+
+elles obtiendront toutes les deux le même hash : `16a9fe0d9fc2db014bac6a320df39f0963e1afb751fb9a2ff6258aee4c2b6773`
+
+On vérifie alors en base si ce hash existe déjà :
+
+- **Il existe** : on incrémente son {easyTerm('compteur de références')}, on fait pointer le {easyTerm('commit')} dessus, et c'est fini.
+- **Il n'existe pas** : on crée le fichier, on le nomme avec son hash, on enregistre le hash en base, on fait pointer le {easyTerm('commit')} dessus, et c'est fini.
+
+En peu d'étapes, on obtient un système bien plus optimisé pour stocker des centaines de fichiers potentiellement similaires.
+</Collapsible>
+
+<Collapsible title="Un mot sur les index">
+Un {easyTerm('index')}, c'est comme l'index à la fin d'un livre : au lieu de lire toutes les pages pour trouver un sujet, on va direct à la bonne. Sans lui, la base doit parcourir toute la table à chaque requête.
+Par contre, ça a un coût : un index prend de la place et ralentit un peu les écritures. On n'en met donc que là où on cherche souvent :
+ 
+- l'historique d'un workspace, trié par date (`workspace_versions`) ;
+- les challenges, sandboxes et scripts d'un environnement (via `environment_id`) ;
+- les runs d'un challenge (`runs`).
+On va même un cran plus loin avec des {easyTerm('index partiel', 'index partiels')} : on n'indexe qu'une partie des lignes. Par exemple, seulement les ressources publiques (champ `public`), ou seulement les blobs que plus rien n'utilise (`ref_count = 0`), pour que leur nettoyage périodique soit rapide.
+</Collapsible>
+
+# Simulation
+
+Pour faire des simulations, nous avons grossièrement 2 tables : `environments` et `challenges`.
+
+<Figure lightbox caption={`Section "Simulation Building" de l'UML`}>
+    <img src={UML_SIMULATION} alt={`Section "Simulation Building" de l'UML`} />
+</Figure>
+
+Ces tables représentent l'un des objectifs piliers que nous voulons atteindre d'ici la fin de la {easyTerm('SAÉ')}.
+
+C'est l'aspect communautaire du site : les utilisateurs peuvent créer des environnements (donc des simulations différentes, comme « Feu de forêt » ou « Nuée de drones ») et les présenter avec une `cover_image`, un `name`, une `description` en Markdown, etc.
+
+Une fois l'environnement prêt, l'utilisateur choisit de publier son script d'environnement (le champ `workspace_id`) pour le rendre accessible aux autres, ou de le garder privé.
+
+<Callout type="warning" title="Attention">
+Une fois publique, une ressource ne peut plus redevenir privée ni être supprimée sans passer par le support, pour des raisons de {easyTerm('rétrocompatibilité')}.
+
+À la place, elle peut être archivée ({easyTerm('soft delete')} avec le champ `deleted_at`) : elle n'est alors plus visible pour les nouveaux arrivants ni modifiable.
+</Callout>
+
+# Espace utilisateur
+
+4 tables y sont dédiées : c'est là que les utilisateurs passent la majorité de leur temps.
+
+<Figure lightbox caption={`Section "User Space" de l'UML`}>
+    <img src={UML_USER_SPACE} alt={`Section "User Space" de l'UML`} />
+</Figure>
+
+On y trouve notamment `user_scripts`, où les utilisateurs créent leurs scripts et peuvent les partager s'ils le souhaitent. Ils peuvent ensuite les exécuter de deux façons :
+
+- **Bac à sable** (`sandboxes`) : aucun objectif, juste du fun. L'exécution peut être rendue publique ou non.
+- **Run** (`runs`) : un objectif défini, à atteindre de la manière la plus efficace possible.
+
+<Callout type="warning" title="Attention">
+Une exécution en bac à sable est privée par défaut. Une run, elle, est considérée comme compétitive et apparaît dans un classement : elle ne peut donc être que publique.
+</Callout>
+
+# IndexedDB
+
+Ce n'est pas une table de la base de données, mais c'est une partie importante : {easyTerm('IndexedDB')} est une mini base de données dans le navigateur, là pour rendre la vie des utilisateurs plus agréable.
+
+<Figure lightbox caption={`Section "IndexedDB" de l'UML`}>
+    <img src={UML_INDEXEDDB} alt={`Section "IndexedDB" de l'UML`} />
+</Figure>
+
+Marre de commencer quelque chose, de refresh sans faire exprès et de tout recommencer à zéro ? Nous aussi ! On met donc en place un {easyTerm('cache')} via IndexedDB qui fait des sauvegardes rapides, invisibles pour l'utilisateur, pendant qu'il écrit son script, avec un {easyTerm('debounce')}.
+
+<Collapsible title="En savoir plus : la synchronisation">
+Pour la synchronisation, on stocke le dernier {easyTerm('commit')} connu en local et on le compare au vrai dernier {easyTerm('commit')} côté serveur. Trois cas possibles :
+
+- **Identiques** : le cache est affiché comme « Cache à jour ».
+- **Différents** : le cache est affiché comme « Cache obsolète ». Avec l'accord de l'utilisateur, on propose un {easyTerm('diff')}, ou d'écraser soit la version distante, soit la locale.
+- **Vérification impossible** ({easyTerm('timeout')}, hors ligne, etc.) : le cache est affiché comme « Non vérifié ». On propose de retenter la synchro plus tard, et on laisse l'utilisateur travailler tranquille.
+
+Dans tous les cas, rien ne se fait sans l'accord de l'utilisateur : on ne présume jamais à sa place.
+</Collapsible>
+
+# Confidentialité & {easyTerm('RGPD')}
+
+Pour terminer, revenons sur un point sensible précisé récemment.
+
+On a vu qu'une ressource ne peut pas être supprimée, et à part dans de rares cas, presque rien ne le sera. Problème : le {easyTerm('RGPD')} interdit de garder des données qui ne servent plus et qui contiennent des informations privées d'un utilisateur.
+
+Rassurez-vous, on y a pensé ! Comme beaucoup d'autres, nous conservons les données, mais {easyTerm('anonymisé', 'anonymisées')}.
+
+Par exemple :
+
+- `my_super_duper_cool_username` **&rarr;** `deleted-user-65ea5ece0ec4`
+- `my_email@example.com` **&rarr;** `user-96fb6e91-f299-49b2-8c31-65ea5ece0ec4@deleted.invalid`
+
+<Callout type='important' title='disclaimer'>
+Si les utilisateurs décident de rajouter leur nom, prénom et informations bancaires dans un commentaire d'un script qu'ils ont publié, on y peut rien et ca sera anonymisé sous réserve de passé par un ticket
+</Callout>

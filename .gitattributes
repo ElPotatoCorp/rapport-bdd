@@ -1,0 +1,70 @@
+# ------------------------------------------------
+# General - normalize line endings for anything detected as text,
+# leave everything else (binaries) untouched. Everything below is
+# either a refinement of this or an explicit binary/text override.
+# ------------------------------------------------
+*                 text=auto
+
+# ------------------------------------------------
+# JS / TS (frontend/, viewer/)
+# ------------------------------------------------
+*.js              text
+*.mjs             text
+*.cjs             text
+*.jsx             text
+*.ts              text
+*.tsx             text
+*.json            text
+*.css             text diff=css
+*.html            text diff=html
+
+package.json      text eol=lf
+package-lock.json text eol=lf -diff
+yarn.lock         text -diff
+pnpm-lock.yaml    text eol=lf -diff
+
+# Fixes GitHub syntax highlighting for JSON-with-comments files
+tsconfig.json     linguist-language=JSON-with-Comments
+.vscode/*.json    linguist-language=JSON-with-Comments
+
+# ------------------------------------------------
+# YAML (GitHub Actions, docker-compose)
+# ------------------------------------------------
+*.yml             text
+*.yaml            text
+
+# ------------------------------------------------
+# Docs
+# ------------------------------------------------
+*.md              text diff=markdown
+*.mdx             text diff=markdown
+*.txt             text
+LICENSE           text
+README*           text
+# lets `git diff` show extracted text instead of "Binary files differ".
+*.pdf             diff=astextplain
+*.odt             diff=astextplain
+
+# ------------------------------------------------
+# Graphics - treat raster as binary, SVG as text (it's just XML)
+# ------------------------------------------------
+*.png             binary
+*.jpg             binary
+*.jpeg            binary
+*.gif             binary
+*.ico             binary
+*.webp            binary
+*.svg             text
+
+# ------------------------------------------------
+# Archives - safety net in case one is ever force-added
+# despite .gitignore; never expect these to be tracked.
+# ------------------------------------------------
+*.zip             binary
+*.tar.gz          binary
+
+# ------------------------------------------------
+# Repo housekeeping - exclude from `git archive` exports
+# ------------------------------------------------
+.gitattributes    export-ignore
+.gitignore        export-ignore
